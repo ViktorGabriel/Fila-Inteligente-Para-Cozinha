@@ -28,5 +28,8 @@
     "typescript": "^5.9.3",
     "vitest": "^4.1.11",
     "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.11"
   }
 }

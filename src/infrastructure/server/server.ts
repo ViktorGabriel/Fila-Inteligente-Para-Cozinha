@@ -12,8 +12,9 @@ import { OrderController } from '../../presentation/controllers/OrderController.
 import { QueueController } from '../../presentation/controllers/QueueController.js';
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3333;
+const TICK_INTERVAL_MS = process.env.QUEUE_TICK_INTERVAL_MS ? Number(process.env.QUEUE_TICK_INTERVAL_MS) : 15000;
 
-// Injeção de dependências
+// Injeção de dependências (Composition Root)
 const orderRepository = new PrismaOrderRepository();
 const queueNotifier = new SocketIoQueueNotifier();
 
@@ -59,9 +60,33 @@ io.on('connection', async socket => {
   });
 });
 
+// Queue Ticker: Recalcula periodicamente a fila para refletir o envelhecimento dos pedidos e SLA
+const ticker = setInterval(async () => {
+  try {
+    const pendingOrders = await orderRepository.findAllPending();
+    if (pendingOrders.length > 0) {
+      await queueNotifier.notifyQueueUpdated(pendingOrders);
+    }
+  } catch (error) {
+    console.error('[Queue Ticker] Erro ao recalcular fila periódica:', error);
+  }
+}, TICK_INTERVAL_MS);
+
 server.listen(PORT, () => {
   console.log(`🍳 Kitchen Display Server (KDS) running on http://localhost:${PORT}`);
   console.log(`📡 WebSocket ready on port ${PORT}`);
+  console.log(`⏱️ Queue dynamic SLA ticker active (interval: ${TICK_INTERVAL_MS}ms)`);
 });
+
+const shutdown = () => {
+  clearInterval(ticker);
+  io.close();
+  server.close(() => {
+    process.exit(0);
+  });
+};
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 
 export { server, app, io };
