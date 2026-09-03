@@ -35,14 +35,14 @@ O sistema adota a **Clean Architecture (Onion Architecture)**, onde o fluxo de d
 
 ## 🗺️ Mapa de Etapas
 
-- [ ] **Etapa 0**: Configuração do Ambiente e Ferramental
-- [ ] **Etapa 1**: Camada Core e Entidades de Domínio Puro
-- [ ] **Etapa 2**: Serviço de Priorização Inteligente por Faixas de SLA
-- [ ] **Etapa 3**: Camada de Aplicação (Use Cases & In-Memory Tests)
-- [ ] **Etapa 4**: Camada de Infraestrutura (Prisma ORM & PostgreSQL)
-- [ ] **Etapa 5**: Camada de Apresentação (Express REST API & Schemas Zod)
-- [ ] **Etapa 6**: Tempo Real com WebSocket (Socket.io) & KDS Visualizer
-- [ ] **Etapa 7**: Validação End-to-End e Documentação Final
+- [x] **Etapa 0**: Configuração do Ambiente e Ferramental
+- [x] **Etapa 1**: Camada Core e Entidades de Domínio Puro
+- [x] **Etapa 2**: Serviço de Priorização Inteligente por Faixas de SLA
+- [x] **Etapa 3**: Camada de Aplicação (Use Cases & In-Memory Tests)
+- [x] **Etapa 4**: Camada de Infraestrutura (Prisma ORM & PostgreSQL)
+- [x] **Etapa 5**: Camada de Apresentação (Express REST API & Schemas Zod)
+- [x] **Etapa 6**: Tempo Real com WebSocket (Socket.io) & KDS Visualizer
+- [x] **Etapa 7**: Validação End-to-End e Documentação Final
 
 ---
 
