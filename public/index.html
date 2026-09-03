@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KDS — Fila Inteligente para Cozinha</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --bg-card: #1e293b;
+      --bg-card-hover: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --critical: #ef4444;
+      --critical-bg: rgba(239, 68, 68, 0.15);
+      --high: #f97316;
+      --high-bg: rgba(249, 115, 22, 0.15);
+      --medium: #eab308;
+      --medium-bg: rgba(234, 179, 8, 0.15);
+      --low: #10b981;
+      --low-bg: rgba(16, 185, 129, 0.15);
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: rgba(30, 41, 59, 0.8);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand h1 {
+      font-size: 1.4rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #fff 30%, #94a3b8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0.85rem;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+      border: 1px solid rgba(52, 211, 153, 0.3);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #34d399;
+      box-shadow: 0 0 8px #34d399;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .btn {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+
+    .queue-stats {
+      padding: 1.25rem 2rem;
+      display: flex;
+      gap: 1.5rem;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .stat-pill {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .stat-pill strong {
+      color: var(--text-main);
+      font-size: 1.1rem;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    main {
+      flex: 1;
+      padding: 2rem;
+    }
+
+    .grid-queue {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .order-card {
+      background: var(--bg-card);
+      border-radius: 12px;
+      border: 2px solid transparent;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .order-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+    }
+
+    .order-card.tier-CRITICAL {
+      border-color: var(--critical);
+      background: linear-gradient(180deg, var(--critical-bg) 0%, var(--bg-card) 40%);
+    }
+
+    .order-card.tier-HIGH {
+      border-color: var(--high);
+      background: linear-gradient(180deg, var(--high-bg) 0%, var(--bg-card) 40%);
+    }
+
+    .order-card.tier-MEDIUM {
+      border-color: var(--medium);
+      background: linear-gradient(180deg, var(--medium-bg) 0%, var(--bg-card) 40%);
+    }
+
+    .order-card.tier-LOW {
+      border-color: var(--low);
+      background: linear-gradient(180deg, var(--low-bg) 0%, var(--bg-card) 40%);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .order-customer {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .order-id {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .tier-badge {
+      font-size: 0.75rem;
+      font-weight: 800;
+      padding: 0.3rem 0.6rem;
+      border-radius: 6px;
+      letter-spacing: 0.05em;
+    }
+
+    .tier-CRITICAL .tier-badge {
+      background: var(--critical);
+      color: #fff;
+      animation: pulse 1.5s infinite;
+    }
+
+    .tier-HIGH .tier-badge {
+      background: var(--high);
+      color: #fff;
+    }
+
+    .tier-MEDIUM .tier-badge {
+      background: var(--medium);
+      color: #000;
+    }
+
+    .tier-LOW .tier-badge {
+      background: var(--low);
+      color: #fff;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    .sla-metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 0.75rem;
+      border-radius: 8px;
+    }
+
+    .metric {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .metric-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+
+    .metric-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 1rem;
+    }
+
+    .items-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding-top: 0.75rem;
+      flex: 1;
+    }
+
+    .item-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.875rem;
+    }
+
+    .item-qty-name {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .item-qty {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: 0.75rem;
+    }
+
+    .item-prep {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .card-footer {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+
+    .action-btn {
+      flex: 1;
+      padding: 0.65rem;
+      border: none;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: filter 0.2s;
+    }
+
+    .action-btn:hover {
+      filter: brightness(1.15);
+    }
+
+    .btn-prep {
+      background: #f59e0b;
+      color: #000;
+    }
+
+    .btn-ready {
+      background: #10b981;
+      color: #fff;
+    }
+
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 5rem 2rem;
+      color: var(--text-muted);
+    }
+
+    .empty-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+    }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .modal {
+      background: var(--bg-card);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 480px;
+      padding: 1.75rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 1.25rem;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .form-group label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .form-group input {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 0.65rem 0.85rem;
+      color: #fff;
+      font-family: inherit;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      border: none;
+      padding: 0.6rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <span style="font-size: 1.5rem;">🍳</span>
+      <h1>Kitchen Display System</h1>
+    </div>
+
+    <div class="header-actions">
+      <div id="connStatus" class="status-badge">
+        <span class="status-dot"></span>
+        <span id="connText">Conectado ao vivo</span>
+      </div>
+      <button class="btn" id="openModalBtn">
+        <span>+</span> Novo Pedido
+      </button>
+    </div>
+  </header>
+
+  <div class="queue-stats">
+    <div class="stat-pill">Pedidos na Fila: <strong id="totalOrders">0</strong></div>
+    <div class="stat-pill">🔴 Críticos: <strong id="criticalCount">0</strong></div>
+    <div class="stat-pill">🟠 Altos: <strong id="highCount">0</strong></div>
+    <div class="stat-pill">🟡 Médios: <strong id="mediumCount">0</strong></div>
+    <div class="stat-pill">🟢 Baixos: <strong id="lowCount">0</strong></div>
+  </div>
+
+  <main>
+    <div class="grid-queue" id="queueContainer">
+      <div class="empty-state">
+        <div class="empty-icon">🍳</div>
+        <h3>Nenhum pedido pendente</h3>
+        <p>Aguardando novos pedidos na cozinha...</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal de Criação de Pedido -->
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal">
+      <h2 class="modal-title">Novo Pedido na Cozinha</h2>
+      <form id="orderForm">
+        <div class="form-group">
+          <label for="customerName">Nome do Cliente</label>
+          <input type="text" id="customerName" placeholder="Ex: Maria Silva" required>
+        </div>
+
+        <div class="form-group">
+          <label for="slaDeliveryMinutes">SLA de Entrega (minutos)</label>
+          <input type="number" id="slaDeliveryMinutes" value="35" min="1" required>
+        </div>
+
+        <div class="form-group">
+          <label for="itemName">Item Principal</label>
+          <input type="text" id="itemName" placeholder="Ex: Hambúrguer Artesanal" required>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label for="itemQty">Quantidade</label>
+            <input type="number" id="itemQty" value="1" min="1" required>
+          </div>
+          <div class="form-group">
+            <label for="itemPrep">Tempo Preparo (min)</label>
+            <input type="number" id="itemPrep" value="15" min="1" required>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="closeModalBtn">Cancelar</button>
+          <button type="submit" class="btn">Enviar para Cozinha</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+    const queueContainer = document.getElementById('queueContainer');
+    const totalOrdersEl = document.getElementById('totalOrders');
+    const criticalCountEl = document.getElementById('criticalCount');
+    const highCountEl = document.getElementById('highCount');
+    const mediumCountEl = document.getElementById('mediumCount');
+    const lowCountEl = document.getElementById('lowCount');
+    const connStatus = document.getElementById('connStatus');
+    const connText = document.getElementById('connText');
+
+    socket.on('connect', () => {
+      connStatus.style.background = 'rgba(16, 185, 129, 0.2)';
+      connStatus.style.color = '#34d399';
+      connText.textContent = 'Conectado ao vivo';
+    });
+
+    socket.on('disconnect', () => {
+      connStatus.style.background = 'rgba(239, 68, 68, 0.2)';
+      connStatus.style.color = '#f87171';
+      connText.textContent = 'Desconectado';
+    });
+
+    socket.on('queue:updated', (orders) => {
+      renderQueue(orders);
+    });
+
+    function renderQueue(orders) {
+      totalOrdersEl.textContent = orders.length;
+
+      let critical = 0, high = 0, medium = 0, low = 0;
+      orders.forEach(o => {
+        if (o.priorityTier === 'CRITICAL') critical++;
+        else if (o.priorityTier === 'HIGH') high++;
+        else if (o.priorityTier === 'MEDIUM') medium++;
+        else if (o.priorityTier === 'LOW') low++;
+      });
+
+      criticalCountEl.textContent = critical;
+      highCountEl.textContent = high;
+      mediumCountEl.textContent = medium;
+      lowCountEl.textContent = low;
+
+      if (orders.length === 0) {
+        queueContainer.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">🍳</div>
+            <h3>Nenhum pedido pendente</h3>
+            <p>Aguardando novos pedidos na cozinha...</p>
+          </div>
+        `;
+        return;
+      }
+
+      queueContainer.innerHTML = orders.map(order => {
+        const remainingMin = Math.round(order.remainingMinutes);
+        const isReceived = order.status === 'RECEIVED';
+        const isPrep = order.status === 'IN_PREPARATION';
+
+        return `
+          <div class="order-card tier-${order.priorityTier}">
+            <div class="card-header">
+              <div>
+                <div class="order-customer">${order.customerName}</div>
+                <div class="order-id">#${order.id.slice(0, 8)}</div>
+              </div>
+              <span class="tier-badge">${order.priorityTier}</span>
+            </div>
+
+            <div class="sla-metrics">
+              <div class="metric">
+                <span class="metric-label">Tempo Restante</span>
+                <span class="metric-val" style="color: ${remainingMin <= order.maxPrepTimeMinutes ? 'var(--critical)' : 'inherit'}">
+                  ${remainingMin} min
+                </span>
+              </div>
+              <div class="metric">
+                <span class="metric-label">Preparo Estimado</span>
+                <span class="metric-val">${order.maxPrepTimeMinutes} min</span>
+              </div>
+            </div>
+
+            <div class="items-list">
+              ${order.items.map(item => `
+                <div class="item-row">
+                  <div class="item-qty-name">
+                    <span class="item-qty">${item.quantity}x</span>
+                    <span>${item.name}</span>
+                  </div>
+                  <span class="item-prep">${item.prepTimeMinutes}m</span>
+                </div>
+              `).join('')}
+            </div>
+
+            <div class="card-footer">
+              ${isReceived ? `
+                <button class="action-btn btn-prep" onclick="updateStatus('${order.id}', 'IN_PREPARATION')">
+                  ▶ Iniciar Preparo
+                </button>
+              ` : ''}
+              ${isPrep ? `
+                <button class="action-btn btn-ready" onclick="updateStatus('${order.id}', 'READY')">
+                  ✔ Marcar Pronto
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function updateStatus(orderId, nextStatus) {
+      try {
+        const res = await fetch(`/api/orders/${orderId}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: nextStatus })
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          alert('Erro ao atualizar: ' + (data.error || 'Erro desconhecido'));
+        }
+      } catch (err) {
+        alert('Falha na comunicação com o servidor');
+      }
+    }
+
+    // Modal Control
+    const modal = document.getElementById('modalBackdrop');
+    document.getElementById('openModalBtn').onclick = () => modal.style.display = 'flex';
+    document.getElementById('closeModalBtn').onclick = () => modal.style.display = 'none';
+
+    document.getElementById('orderForm').onsubmit = async (e) => {
+      e.preventDefault();
+
+      const customerName = document.getElementById('customerName').value;
+      const slaDeliveryMinutes = Number(document.getElementById('slaDeliveryMinutes').value);
+      const itemName = document.getElementById('itemName').value;
+      const itemQty = Number(document.getElementById('itemQty').value);
+      const itemPrep = Number(document.getElementById('itemPrep').value);
+
+      try {
+        const res = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customerName,
+            slaDeliveryMinutes,
+            items: [
+              { name: itemName, quantity: itemQty, prepTimeMinutes: itemPrep }
+            ]
+          })
+        });
+
+        if (res.ok) {
+          modal.style.display = 'none';
+          document.getElementById('orderForm').reset();
+        } else {
+          const data = await res.json();
+          alert('Erro: ' + (data.error || 'Não foi possível cadastrar'));
+        }
+      } catch (err) {
+        alert('Falha ao enviar pedido');
+      }
+    };
+  </script>
+</body>
+</html>
