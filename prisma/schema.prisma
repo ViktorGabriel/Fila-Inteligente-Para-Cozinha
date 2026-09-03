@@ -1,0 +1,32 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Order {
+  id                 String      @id @default(uuid())
+  customerName       String      @map("customer_name")
+  status             String      @default("RECEIVED")
+  receivedAt         DateTime    @default(now()) @map("received_at")
+  slaDeliveryMinutes Int         @map("sla_delivery_minutes")
+  items              OrderItem[]
+
+  @@index([status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id              String @id @default(uuid())
+  orderId         String @map("order_id")
+  order           Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  name            String
+  quantity        Int
+  prepTimeMinutes Int    @map("prep_time_minutes")
+
+  @@index([orderId])
+  @@map("order_items")
+}
